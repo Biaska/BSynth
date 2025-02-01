@@ -1,5 +1,8 @@
 #include "leaf.h"
 
+// compile command
+// gcc -IInc/ -ISrc/ -IExternals -o main1 main.c -Lbuild -lleaf -lm
+
 #define MEM_SIZE 500000
 #define AUDIO_BUFFER_SIZE 128
 
@@ -67,7 +70,7 @@ int main()
     printf("HZ set to 440...\n");
     tCycle_setFreq(mySine, 440.0);
 
-    // now, in your audio callback a function that will be called every audio frame,
+    // now, in your audio callback (a function that will be called every audio frame,
     // to compute the samples needed to fill the audio buffer) tick the LEAF audio object
     // to generate or process audio samples.
 
