@@ -14,14 +14,14 @@ typedef enum
 } OscillatorType;
 
 // Function pointer for oscillator tick function
-typedef float (*OscillatorTickFn)(void *osc);
-typedef void  (*OscillatorFreeFn)(void *osc);
+typedef float (*OscillatorTickFn)(tCycle osc);
+typedef void  (*OscillatorFreeFn)(tCycle *osc);
 typedef void  (*OscillatorInitFn)(void *osc, LEAF *leaf);
 typedef void  (*OscillatorSetFreqFn)(void *osc, float freq);
 typedef void  (*OscillatorSetSampleRateFn)(void *osc, float sr);
 typedef void  (*OscillatorSetPhaseFn)(void *osc, float phase);
 
-// Struct for voice handling
+// Struct for oscillator voice handling
 typedef struct
 {
     LEAF *leaf;                             // LEAF instance
@@ -37,8 +37,11 @@ typedef struct
 
 // Fix these functions
 
-void synth_init(Synth *synth, LEAF *leaf, int sampleRate, void *oscType);
-void synth_setOscillatorType(Synth *synth, void *oscType);
+Synth *synth_init(LEAF *leaf, int sampleRate, OscillatorType oscType);
+void synth_free(Synth *synth);
+int synth_getNumActiveVoices(Synth *synth);
+float synth_tick(Synth *synth);
+void synth_setOscillatorType(Synth *synth, OscillatorType oscType);
 void synth_noteOn(Synth *synth, int note, uint8_t velocity);
 void synth_noteOff(Synth *synth, int note);
 

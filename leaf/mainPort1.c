@@ -4,8 +4,11 @@
 #include <stdlib.h>
 #include <math.h>
 
+#include "synth.h"
+
 #define MEM_SIZE 500000
 #define AUDIO_BUFFER_SIZE 128
+#define SAMPLE_RATE 48000
 #define MAX_VOICES 8 // Max polyphony
 
 float randomNumber()
@@ -13,11 +16,6 @@ float randomNumber()
     return (float)rand() / (float)RAND_MAX;
 }
 
-// LEAF & audio objects
-LEAF leaf;
-tSimplePoly poly;
-tCycle oscillators[MAX_VOICES];
-char myMemory[MEM_SIZE];
 
 // Simulated MIDI input (C Major chord)
 int midiNotes[] = {42, 46, 48}; // MIDI Notes: C4, E4, G4
@@ -37,20 +35,12 @@ static int audioCallback(const void *inputBuffer,
                          void *userData)
 {
     float *out = (float *)outputBuffer;
+    Synth *synth = (Synth *)userData;
 
     for (unsigned long i = 0; i < framesPerBuffer; i++)
     {
-        float sample = 0.0f;
-        int activeVoices = 0;
-
-        for (int j = 0; j < MAX_VOICES; j++)
-        {
-            if (tSimplePoly_isOn(poly, j))
-            {
-                sample += tCycle_tick(oscillators[j]);
-                activeVoices++;
-            }
-        }
+        int activeVoices = synth_getNumActiveVoices(synth);
+        float sample = synth_tick(synth);
 
         // Prevent clipping
         if (activeVoices > 0)
@@ -59,6 +49,7 @@ static int audioCallback(const void *inputBuffer,
         }
 
         *out++ = sample;
+        printf("out: %f sample %f\n", *out, sample);
     }
 
     return paContinue;
@@ -68,32 +59,26 @@ int main()
 {
 
 /*============================   Iintialize Leaf   =============================*/
+    LEAF leaf;
+    char mem[MEM_SIZE];
 
     // Initialize LEAF
     printf("Initializing LEAF...\n");
-    LEAF_init(&leaf, 48000, myMemory, MEM_SIZE, &randomNumber);
+    LEAF_init(&leaf, SAMPLE_RATE, mem, MEM_SIZE, &randomNumber);
+    printf("Leaf initialized.\n");
 
-/*============================   Handle Oscillator   =============================*/
+/*============================   Initialize Synth   =============================*/
 
-    // Initialize polyphonic MIDI handler
-    tSimplePoly_init(&poly, MAX_VOICES, &leaf);
+    printf("Initializing synth...\n");
+    Synth *synth = synth_init(&leaf, SAMPLE_RATE, OSC_SINE);
+    printf("Synth initialized.\n");
 
-    // Initialize oscillators
-    for (int i = 0; i < MAX_VOICES; i++)
-    {
-        tCycle_init(&oscillators[i], &leaf);
-    }
-
-    // Simulate MIDI note-on messages
+    // simulate midi input
     for (int i = 0; i < 3; i++) // Playing 3 notes (C, E, G)
     {
-        int voice = tSimplePoly_noteOn(poly, midiNotes[i], velocity);
-        if (voice >= 0) // Ensure the voice is assigned
-        {
-            float freq = midiToHz(midiNotes[i]);
-            tCycle_setFreq(oscillators[voice], freq);
-        }
+        synth_noteOn(synth, midiNotes[i], velocity);
     }
+
 
 /*============================   Handle Audio Stream   =============================*/
 
@@ -115,7 +100,7 @@ int main()
                                48000,             // Sample rate
                                AUDIO_BUFFER_SIZE, // Frames per buffer
                                audioCallback,     // Callback function
-                               NULL);             // No user data
+                               synth);            // No user data
     if (err != paNoError)
     {
         fprintf(stderr, "PortAudio error: %s\n", Pa_GetErrorText(err));
@@ -136,11 +121,21 @@ int main()
     printf("Playing sound. Press Enter to stop.\n");
     getchar(); // Wait for user input
 
+    // simulate midi input stopping
+    for (int i = 0; i < 3; i++) // Stopping 3 notes (C, E, G)
+    {
+        synth_noteOff(synth, midiNotes[i]);
+    }
+
+
 /*============================   Stop Program   =============================*/
     Pa_StopStream(stream);
     Pa_CloseStream(stream);
     Pa_Terminate();
     printf("Audio stream stopped.\n");
+
+    printf("Cleaning up synth...\n");
+    synth_free(synth);
 
     return 0;
 }

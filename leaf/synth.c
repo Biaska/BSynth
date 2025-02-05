@@ -9,7 +9,7 @@ static float midiToHz(int midiNote)
 }
 
 // Function to initialize a specific oscillator type
-static void synth_setOscillatorType(Synth *synth, OscillatorType oscType)
+void synth_setOscillatorType(Synth *synth, OscillatorType oscType)
 {
     // Assign function pointers based on the oscillator type
     switch (oscType)
@@ -19,67 +19,97 @@ static void synth_setOscillatorType(Synth *synth, OscillatorType oscType)
         synth->init = (OscillatorInitFn)tCycle_init;
         synth->free = (OscillatorFreeFn)tCycle_free;
         synth->setFreq = (OscillatorSetFreqFn)tCycle_setFreq;
-        synth->setPhase = (OscillatorSetSampleRateFn)tCycle_setSampleRate;
-        synth->setSample = (OscillatorSetPhaseFn)tCycle_setPhase;
+        synth->setSample = (OscillatorSetSampleRateFn)tCycle_setSampleRate;
+        synth->setPhase = (OscillatorSetPhaseFn)tCycle_setPhase;
         break;
     case OSC_SQUARE:
         synth->tick = (OscillatorTickFn)tSquare_tick;
         synth->init = (OscillatorInitFn)tSquare_init;
         synth->free = (OscillatorFreeFn)tSquare_free;
         synth->setFreq = (OscillatorSetFreqFn)tSquare_setFreq;
-        synth->setPhase = (OscillatorSetSampleRateFn)tSquare_setSampleRate;
-        synth->setSample = (OscillatorSetPhaseFn)tSquare_setPhase;
+        synth->setSample = (OscillatorSetSampleRateFn)tSquare_setSampleRate;
+        synth->setPhase = (OscillatorSetPhaseFn)tSquare_setPhase;
         break;
     case OSC_SAW:
         synth->tick = (OscillatorTickFn)tSawtooth_tick;
         synth->init = (OscillatorInitFn)tSawtooth_init;
         synth->free = (OscillatorFreeFn)tSawtooth_free;
         synth->setFreq = (OscillatorSetFreqFn)tSawtooth_setFreq;
-        synth->setPhase = (OscillatorSetSampleRateFn)tSawtooth_setSampleRate;
-        synth->setSample = (OscillatorSetPhaseFn)tSawtooth_setPhase;
+        synth->setSample = (OscillatorSetSampleRateFn)tSawtooth_setSampleRate;
+        synth->setPhase = (OscillatorSetPhaseFn)tSawtooth_setPhase;
         break;
 
     default:
         return;
     }
 
-    void *type;
-
     // Initialize all voices with the selected oscillator type
     for (int i = 0; i < MAX_VOICES; i++)
     {
         if (oscType == OSC_SINE)
         {
-            tCycle type;
+            tCycle osc;
+            synth->init(&osc, synth->leaf);
+            synth->oscillators[i] = &osc;
         } else if (oscType == OSC_SQUARE)
         {
-            tSquare type;
+            tSquare osc;
+            synth->init(&osc, synth->leaf);
+            synth->oscillators[i] = &osc;
         } else if (oscType == OSC_SAW) {
-            tSawtooth type;
+            tSawtooth osc;
+            synth->init(&osc, synth->leaf);
+            synth->oscillators[i] = &osc;
         }
-        synth->oscillators[i] = type;
-        synth->init(synth->oscillators[i], synth->leaf);
+
     }
 }
 
 // Initialize the synthesizer
-void synth_init(Synth *synth, LEAF *leaf, int sampleRate, OscillatorType oscType)
+Synth *synth_init(LEAF *leaf, int sampleRate, OscillatorType oscType)
 {
+    Synth *synth = (Synth *)malloc(sizeof(Synth));
     synth->leaf = leaf;
     tSimplePoly_init(&synth->poly, MAX_VOICES, leaf);
     synth_setOscillatorType(synth, oscType);
+    return synth;
 }
 
 // Free synth from mempool memory
 void synth_free(Synth *synth)
 {
-    // TODO
+    tSimplePoly_free(&synth->poly);
+    for (int i = 0; i<MAX_VOICES; i++)
+    {
+        synth->free(synth->oscillators[i]);
+    }
+    free(synth);
+}
+
+// Get the number of active voices
+int synth_getNumActiveVoices(Synth *synth)
+{
+    return tSimplePoly_getNumActiveVoices(synth->poly);
+}
+
+// Handle tick for all oscillators
+float synth_tick(Synth *synth)
+{
+    float sample = 0.0f;
+    for (int i = 0; i < MAX_VOICES; i++)
+    {
+        if (tSimplePoly_isOn(synth->poly, i))
+        {
+            sample += synth->tick(synth->oscillators[i]);
+        }
+    }
+    return sample;
 }
 
 // Handle MIDI Note On
 void synth_noteOn(Synth *synth, int note, uint8_t velocity)
 {
-    int voice = tSimplePoly_noteOn(&synth->poly, note, velocity);
+    int voice = tSimplePoly_noteOn(synth->poly, note, velocity);
     if (voice >= 0 && synth->setFreq)
     {
         float freq = midiToHz(note);
@@ -90,6 +120,6 @@ void synth_noteOn(Synth *synth, int note, uint8_t velocity)
 // Handle MIDI Note Off
 void synth_noteOff(Synth *synth, int note)
 {
-    int voice = tSimplePoly_noteOff(&synth->poly, note);
+    int voice = tSimplePoly_noteOff(synth->poly, note);
     synth->setFreq(synth->oscillators[voice], 0);
 }

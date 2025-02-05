@@ -2,18 +2,31 @@
 #include <portaudio.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <math.h>
 
 #define MEM_SIZE 500000
 #define AUDIO_BUFFER_SIZE 128
+#define MAX_VOICES 8 // Max polyphony
 
 float randomNumber()
 {
     return (float)rand() / (float)RAND_MAX;
 }
 
+// LEAF & audio objects
 LEAF leaf;
-tCycle mySine;
+tSimplePoly poly;
+tCycle oscillators[MAX_VOICES];
 char myMemory[MEM_SIZE];
+
+// Simulated MIDI input (C Major chord)
+int midiNotes[] = {42, 46, 48}; // MIDI Notes: C4, E4, G4
+uint8_t velocity = 100;         // Fixed velocity
+
+float midiToHz(int midiNote)
+{
+    return 440.0f * powf(2.0f, (midiNote - 69) / 12.0f);
+}
 
 // Audio callback function for PortAudio
 static int audioCallback(const void *inputBuffer,
@@ -27,7 +40,26 @@ static int audioCallback(const void *inputBuffer,
 
     for (unsigned long i = 0; i < framesPerBuffer; i++)
     {
-        *out++ = tCycle_tick(mySine); // Generate sine wave samples
+        float sample = 0.0f;
+        int activeVoices = 0;
+
+        for (int j = 0; j < MAX_VOICES; j++)
+        {
+            if (tSimplePoly_isOn(poly, j))
+            {
+                sample += tCycle_tick(oscillators[j]);
+                activeVoices++;
+            }
+        }
+
+        // Prevent clipping
+        if (activeVoices > 0)
+        {
+            sample /= activeVoices;
+        }
+
+        *out++ = sample;
+        printf("out: %f sample %f\n", *out, sample);
     }
 
     return paContinue;
@@ -35,13 +67,36 @@ static int audioCallback(const void *inputBuffer,
 
 int main()
 {
+
+/*============================   Iintialize Leaf   =============================*/
+
     // Initialize LEAF
     printf("Initializing LEAF...\n");
     LEAF_init(&leaf, 48000, myMemory, MEM_SIZE, &randomNumber);
 
-    // Initialize sine wave oscillator
-    tCycle_init(&mySine, &leaf);
-    tCycle_setFreq(mySine, 80.0);
+/*============================   Handle Oscillator   =============================*/
+
+    // Initialize polyphonic MIDI handler
+    tSimplePoly_init(&poly, MAX_VOICES, &leaf);
+
+    // Initialize oscillators
+    for (int i = 0; i < MAX_VOICES; i++)
+    {
+        tCycle_init(&oscillators[i], &leaf);
+    }
+
+    // Simulate MIDI note-on messages
+    for (int i = 0; i < 3; i++) // Playing 3 notes (C, E, G)
+    {
+        int voice = tSimplePoly_noteOn(poly, midiNotes[i], velocity);
+        if (voice >= 0) // Ensure the voice is assigned
+        {
+            float freq = midiToHz(midiNotes[i]);
+            tCycle_setFreq(oscillators[voice], freq);
+        }
+    }
+
+/*============================   Handle Audio Stream   =============================*/
 
     // Initialize PortAudio
     printf("Initializing PortAudio...\n");
@@ -82,11 +137,9 @@ int main()
     printf("Playing sound. Press Enter to stop.\n");
     getchar(); // Wait for user input
 
-    // Stop the audio stream
+/*============================   Stop Program   =============================*/
     Pa_StopStream(stream);
     Pa_CloseStream(stream);
-
-    // Terminate PortAudio
     Pa_Terminate();
     printf("Audio stream stopped.\n");
 
