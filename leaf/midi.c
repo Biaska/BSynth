@@ -116,7 +116,7 @@ int main(){
     // printf("Done enumerating.\n");
     // printf("Now reading events from our port in a loop.\n");
 
-    int MIDI_CLIENT = 40;
+    int MIDI_CLIENT = 16;
     int MIDI_PORT = 0;
 
 

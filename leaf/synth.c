@@ -78,11 +78,15 @@ Synth *synth_init(LEAF *leaf, int sampleRate, OscillatorType oscType)
 // Free synth from mempool memory
 void synth_free(Synth *synth)
 {
-    tSimplePoly_free(&synth->poly);
     for (int i = 0; i<MAX_VOICES; i++)
     {
-        synth->free(synth->oscillators[i]);
+        if (synth->oscillators[i])
+        {
+            synth->free(synth->oscillators[i]);
+        }
     }
+
+        tSimplePoly_free(&synth->poly);
     free(synth);
 }
 
