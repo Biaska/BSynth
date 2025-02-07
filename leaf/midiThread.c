@@ -17,7 +17,7 @@ snd_seq_t *midi_init()
     int err = snd_seq_open(&seq_handle, "default", SND_SEQ_OPEN_INPUT, 0);
     if (err < 0) {
         fprintf(stderr, "Error opening sequencer: %s\n", snd_strerror(err));
-        return 1;
+        exit(1);
     }
     snd_seq_set_client_name(seq_handle, "BSynth");
 
@@ -27,7 +27,7 @@ snd_seq_t *midi_init()
     if (in_port < 0) {
         fprintf(stderr, "Error creating sequencer port: %s\n", snd_strerror(in_port));
         snd_seq_close(seq_handle);
-        return 1;
+        exit(1);
     }
     printf("MIDI sequencer port created (client %d, port %d).\n", snd_seq_client_id(seq_handle), in_port);
 
@@ -57,6 +57,7 @@ snd_seq_t *midi_init()
     else {
         printf("Subscribed to %d:%d successfully.\n", MIDI_CLIENT, MIDI_PORT);
     }
+    return seq_handle;
 }
 
 // MIDI event loop thread

@@ -3,7 +3,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
+#include <pthread.h>
 
+#include "midiThread.h"
 #include "sineSynth.h"
 
 #define MEM_SIZE 500000
@@ -49,7 +51,10 @@ static int audioCallback(const void *inputBuffer,
         }
 
         *out++ = sample;
-        printf("out: %f sample %f\n", *out, sample);
+        // if (*out != 0.0f)
+        // {
+        //     printf("out: %f sample %f\n", *out, sample);
+        // }
     }
 
     return paContinue;
@@ -73,12 +78,22 @@ int main()
     SineSynth *synth = synth_init(&leaf, SAMPLE_RATE);
     printf("Synth initialized.\n");
 
-    // simulate midi input
-    for (int i = 0; i < 3; i++) // Playing 3 notes (C, E, G)
-    {
-        synth_noteOn(synth, midiNotes[i], velocity);
-    }
+/*============================   Initialize Midi Thread   =============================*/
 
+    snd_seq_t *seq_handle = midi_init();
+ 
+
+    // Set up and start the MIDI thread.
+    MidiThreadData midiData;
+    midiData.seq_handle = seq_handle;
+    midiData.synth = synth;
+
+    pthread_t midi_thread;
+    if (pthread_create(&midi_thread, NULL, midi_thread_func, &midiData) != 0) {
+        fprintf(stderr, "Error creating MIDI thread.\n");
+        return 1;
+    }
+    printf("MIDI thread started.\n");
 
 /*============================   Handle Audio Stream   =============================*/
 
@@ -120,12 +135,6 @@ int main()
 
     printf("Playing sound. Press Enter to stop.\n");
     getchar(); // Wait for user input
-
-    // simulate midi input stopping
-    for (int i = 0; i < 3; i++) // Stopping 3 notes (C, E, G)
-    {
-        synth_noteOff(synth, midiNotes[i]);
-    }
 
 
 /*============================   Stop Program   =============================*/
