@@ -3,9 +3,14 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
+#include <pthread.h>
+
+#include "midiThread.h"
+#include "sineSynth.h"
 
 #define MEM_SIZE 500000
 #define AUDIO_BUFFER_SIZE 128
+#define SAMPLE_RATE 48000
 #define MAX_VOICES 8 // Max polyphony
 
 float randomNumber()
@@ -13,14 +18,9 @@ float randomNumber()
     return (float)rand() / (float)RAND_MAX;
 }
 
-// LEAF & audio objects
-LEAF leaf;
-tSimplePoly poly;
-tCycle oscillators[MAX_VOICES];
-char myMemory[MEM_SIZE];
 
 // Simulated MIDI input (C Major chord)
-int midiNotes[] = {42, 46, 48}; // MIDI Notes: C4, E4, G4
+int midiNotes[] = {60, 64, 67}; // MIDI Notes: C4, E4, G4
 uint8_t velocity = 100;         // Fixed velocity
 
 float midiToHz(int midiNote)
@@ -37,20 +37,12 @@ static int audioCallback(const void *inputBuffer,
                          void *userData)
 {
     float *out = (float *)outputBuffer;
+    SineSynth *synth = (SineSynth *)userData;
 
     for (unsigned long i = 0; i < framesPerBuffer; i++)
     {
-        float sample = 0.0f;
-        int activeVoices = 0;
-
-        for (int j = 0; j < MAX_VOICES; j++)
-        {
-            if (tSimplePoly_isOn(poly, j))
-            {
-                sample += tCycle_tick(oscillators[j]);
-                activeVoices++;
-            }
-        }
+        int activeVoices = synth_getNumActiveVoices(synth);
+        float sample = synth_tick(synth);
 
         // Prevent clipping
         if (activeVoices > 0)
@@ -59,6 +51,10 @@ static int audioCallback(const void *inputBuffer,
         }
 
         *out++ = sample;
+        // if (*out != 0.0f)
+        // {
+        //     printf("out: %f sample %f\n", *out, sample);
+        // }
     }
 
     return paContinue;
@@ -68,32 +64,36 @@ int main()
 {
 
 /*============================   Iintialize Leaf   =============================*/
+    LEAF leaf;
+    char mem[MEM_SIZE];
 
     // Initialize LEAF
     printf("Initializing LEAF...\n");
-    LEAF_init(&leaf, 48000, myMemory, MEM_SIZE, &randomNumber);
+    LEAF_init(&leaf, SAMPLE_RATE, mem, MEM_SIZE, &randomNumber);
+    printf("Leaf initialized.\n");
 
-/*============================   Handle Oscillator   =============================*/
+/*============================   Initialize Synth   =============================*/
 
-    // Initialize polyphonic MIDI handler
-    tSimplePoly_init(&poly, MAX_VOICES, &leaf);
+    printf("Initializing synth...\n");
+    SineSynth *synth = synth_init(&leaf, SAMPLE_RATE);
+    printf("Synth initialized.\n");
 
-    // Initialize oscillators
-    for (int i = 0; i < MAX_VOICES; i++)
-    {
-        tCycle_init(&oscillators[i], &leaf);
+/*============================   Initialize Midi Thread   =============================*/
+
+    snd_seq_t *seq_handle = midi_init();
+ 
+
+    // Set up and start the MIDI thread.
+    MidiThreadData midiData;
+    midiData.seq_handle = seq_handle;
+    midiData.synth = synth;
+
+    pthread_t midi_thread;
+    if (pthread_create(&midi_thread, NULL, midi_thread_func, &midiData) != 0) {
+        fprintf(stderr, "Error creating MIDI thread.\n");
+        return 1;
     }
-
-    // Simulate MIDI note-on messages
-    for (int i = 0; i < 3; i++) // Playing 3 notes (C, E, G)
-    {
-        int voice = tSimplePoly_noteOn(poly, midiNotes[i], velocity);
-        if (voice >= 0) // Ensure the voice is assigned
-        {
-            float freq = midiToHz(midiNotes[i]);
-            tCycle_setFreq(oscillators[voice], freq);
-        }
-    }
+    printf("MIDI thread started.\n");
 
 /*============================   Handle Audio Stream   =============================*/
 
@@ -115,7 +115,7 @@ int main()
                                48000,             // Sample rate
                                AUDIO_BUFFER_SIZE, // Frames per buffer
                                audioCallback,     // Callback function
-                               NULL);             // No user data
+                               synth);            // No user data
     if (err != paNoError)
     {
         fprintf(stderr, "PortAudio error: %s\n", Pa_GetErrorText(err));
@@ -136,11 +136,15 @@ int main()
     printf("Playing sound. Press Enter to stop.\n");
     getchar(); // Wait for user input
 
+
 /*============================   Stop Program   =============================*/
     Pa_StopStream(stream);
     Pa_CloseStream(stream);
     Pa_Terminate();
     printf("Audio stream stopped.\n");
+
+    printf("Cleaning up synth...\n");
+    synth_free(synth);
 
     return 0;
 }
