@@ -89,6 +89,9 @@ void synth_noteOn(SineSynth *synth, int note, uint8_t velocity)
 // Handle MIDI Note Off
 void synth_noteOff(SineSynth *synth, int note)
 {
-    int voice = tSimplePoly_noteOff(synth->poly, note);
-    synth->setFreq(synth->oscillators[voice], 0);
+    if (tSimplePoly_findVoiceAssignedToNote(synth->poly, note) >= 0)
+    {
+        int voice = tSimplePoly_noteOff(synth->poly, note);
+        synth->setFreq(synth->oscillators[voice], 0);
+    }
 }

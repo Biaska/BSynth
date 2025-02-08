@@ -8,6 +8,7 @@
 typedef struct {
     snd_seq_t *seq_handle;
     SineSynth *synth;
+    int local_port;
 } MidiThreadData;
 
 int get_midi_client();
