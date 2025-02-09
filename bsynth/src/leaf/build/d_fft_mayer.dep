@@ -1,0 +1,4 @@
+build/Externals/d_fft_mayer.o: Externals/d_fft_mayer.c \
+ /usr/include/stdc-predef.h Externals/../leaf-config.h
+/usr/include/stdc-predef.h:
+Externals/../leaf-config.h:

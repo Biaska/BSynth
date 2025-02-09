@@ -1,7 +1,7 @@
 #ifndef SYNTH_H
 #define SYNTH_H
 
-#include "leaf.h"
+#include "leaf/leaf.h"
 
 #define MAX_VOICES 8
 

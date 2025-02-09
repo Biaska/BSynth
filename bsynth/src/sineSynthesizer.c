@@ -1,4 +1,4 @@
-#include "leaf.h"
+#include "leaf/leaf.h"
 #include <portaudio.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -7,6 +7,8 @@
 
 #include "midiThread.h"
 #include "sineSynth.h"
+
+// gcc -g -Ileaf/Inc/ -Ileaf/src/ -Ileaf/Externals -IPortAudio -o sineSynthesizer sineSynthesizer.c sineSynth.c midiThread.c -L./leaf/build -lportaudio -lleaf -lm -lpthread -lasound
 
 #define MEM_SIZE 500000
 #define AUDIO_BUFFER_SIZE 128

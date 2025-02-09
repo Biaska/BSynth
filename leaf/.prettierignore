@@ -1,9 +1,0 @@
-build
-Externals
-Inc
-Src
-test
-MakeFile
-leaf.c
-leaf.cpp
-leaf-config.h

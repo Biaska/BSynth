@@ -1,7 +1,7 @@
 #ifndef SINESYNTH_H
 #define SINESYNTH_H
 
-#include "leaf.h"
+#include "leaf/leaf.h"
 
 #define MAX_VOICES 8
 
