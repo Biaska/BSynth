@@ -33,4 +33,4 @@ This software synthesizer is designed to run on embedded Linux, specifically on 
 - Build tools (e.g., make, cmake) as needed.
 
 ## Usage & Configuration
-Information regarding setup, command-line arguments, configuration files, and runtime parameters will be provided in a future update.
+Information regarding setup and configuration will be provided in a future update.
